@@ -28,6 +28,8 @@ module.exports = {
     // 括号钱空格
     'space-before-function-paren': 0,
     // 未使用的变量
-    'no-unused-vars': 1
+    'no-unused-vars': 1,
+    // 代码块内空白
+    'padded-blocks': 1
   }
 }

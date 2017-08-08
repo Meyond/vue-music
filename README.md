@@ -1,6 +1,6 @@
-# y
+# music
 
-> y
+> vue-music-web-app
 
 ## Build Setup
 
