@@ -23,13 +23,14 @@ var proxyTable = config.dev.proxyTable
 
 var app = express()
 
-// 设置后端代理服务端请求
+// 通过axios向c.y.qq.com发送请求，将结果返回给getDiscList
 var apiRoutes = express.Router()
+
 apiRoutes.get('/getDiscList', function(req, res) {
-  var url = 'https://c.y.qq.com/splcloud/fcgi-bin/fcg_get_diss_by_tag.fcg?'
+  var url = 'https://c.y.qq.com/splcloud/fcgi-bin/fcg_get_diss_by_tag.fcg'
   axios.get(url, {
     headers: {
-      referer: 'http://c.y.qq.com',
+      referer: 'https://c.y.qq.com',
       host: 'c.y.qq.com'
     },
     params: req.query
