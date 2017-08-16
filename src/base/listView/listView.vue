@@ -1,5 +1,5 @@
 <template>
-  <scroll class="listview" :data="data" ref="listview">
+  <scroll class="listview" :data="data" ref="listview" :listenScroll="listenScroll" @scroll="scroll" :probeType="probeType">
     <ul>
       <li class="list-group" ref="listGroup" v-for="(group, index) in data" :key="index">
         <h2 class="list-group-title">{{group.title}}</h2>
@@ -11,9 +11,10 @@
         </ul>
       </li>
     </ul>
+    <!-- 歌手组右侧列表 修饰符.stop.prevent阻止冒泡和原生点击事件-->
     <div class="list-shortcut" @touchstart="onShortcutTouchStart" @touchmove.stop.prevent="onShortcutTouchMove">
       <ul>
-        <li v-for="(item, index) in shortcutList" :key="index" :data-index="index" class="item">
+        <li v-for="(item, index) in shortcutList" :key="index" :data-index="index" class="item" :class="{'current': currentIndex===index}">
           {{item}}
         </li>
       </ul>
@@ -34,11 +35,21 @@ export default {
       default: []
     }
   },
+  data() {
+    return {
+      scrollY: -1,
+      currentIndex: 0
+    }
+  },
   created() {
-    // touch没有放在props中，是因为vue会默认为其添加getter/setter监听其变化
+    // touch没有放在props中，是因为vue会默认为其添加getter/setter监听其变化，在这里创建一个touch对象用作在不同函数之间传递数据
     this.touch = {}
+    this.listenScroll = true
+    this.listHeight = []
+    this.probeType = 3 // 实时监听scroll事件
   },
   computed: {
+    // 通过传入的data获取歌手组首字
     shortcutList() {
       return this.data.map((group) => {
         return group.title.substr(0, 1)
@@ -61,8 +72,46 @@ export default {
       let anchorIndex = parseInt(this.touch.anchorIndex) + delta
       this._scrollTo(anchorIndex)
     },
+    scroll(pos) {
+      // 实时获取滚动的Y轴的距离
+      this.scrollY = pos.y
+    },
     _scrollTo(index) {
       this.$refs.listview.scrollToElement(this.$refs.listGroup[index], 0)
+    },
+    _calculateHeight() {
+      this.listHeight = []
+      const list = this.$refs.listGroup
+      let height = 0
+      this.listHeight.push(height)
+
+      // list高度集合
+      for (var i = 0; i < list.length; i++) {
+        let item = list[i]
+        height += item.clientHeight
+        this.listHeight.push(height)
+      }
+    }
+  },
+  watch: {
+    data() {
+      // 数据变化到dom更新会有延时，因此使用setTimeout
+      setTimeout(() => {
+        this._calculateHeight()
+      }, 20)
+    },
+    scrollY(y) {
+      const listHeight = this.listHeight
+      for (var i = 0; i < listHeight.length; i++) {
+        var h1 = listHeight[i]
+        var h2 = listHeight[i + 1]
+        if (!h2 || (-y > h1 && -y < h2)) {
+          this.currentIndex = i
+          console.log(i)
+          return
+        }
+      }
+      this.currentIndex = 0
     }
   },
   components: {

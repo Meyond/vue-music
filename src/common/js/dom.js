@@ -14,7 +14,7 @@ export function hasClass(el, className) {
   return reg.test(el.className)
 }
 
-// dom事件的get/set函数
+// 被点击对象的get/set函数
 export function getData(el, name, val) {
   const prefix = 'data-'
   name = prefix + name

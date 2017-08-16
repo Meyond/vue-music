@@ -20,6 +20,10 @@ export default {
     data: {
       type: Array,
       default: null
+    },
+    listenScroll: {
+      type: Boolean,
+      default: false
     }
   },
   mounted() {
@@ -37,6 +41,13 @@ export default {
         probeType: this.probeType,
         click: this.click
       })
+      // 监听滚动事件,拿到当前位置，包括x y
+      if (this.listenScroll) {
+        let that = this
+        this.scroll.on('scroll', (pos) => {
+          that.$emit('scroll', pos)
+        })
+      }
     },
     enable() {
       this.scroll && this.scroll.enable()
