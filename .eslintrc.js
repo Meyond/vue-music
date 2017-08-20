@@ -30,6 +30,8 @@ module.exports = {
     // 未使用的变量
     'no-unused-vars': 1,
     // 代码块内空白
-    'padded-blocks': 1
+    'padded-blocks': 1,
+    // 末尾逗号
+    'comma-dangle': 1
   }
 }
