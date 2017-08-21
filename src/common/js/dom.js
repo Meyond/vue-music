@@ -24,3 +24,37 @@ export function getData(el, name, val) {
     return el.getAttribute(name)
   }
 }
+
+// 浏览器能力检测
+let elementStyle = document.createElement('div').style
+
+// 自动执行返回当前浏览器的对应前缀
+let vendor = (() => {
+  let transformNames = {
+    webkit: 'webkitTransform',
+    Moz: 'MozTransform',
+    ms: 'msTransform',
+    O: 'OTransform',
+    standard: 'transform'
+  }
+
+  for (var key in transformNames) {
+    if (elementStyle[transformNames[key]] !== undefined) {
+      return key
+    }
+  }
+
+  return false
+})()
+
+export function prefixTransform(style) {
+  if (vendor === false) {
+    return false
+  }
+
+  if (vendor === 'standard') {
+    return style
+  }
+  // 浏览器前缀加上样式名首字母大写后的字符串
+  return vendor + style.charAt(0).toUpperCase() + style.substr(1)
+}
