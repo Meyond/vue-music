@@ -1,7 +1,7 @@
 <template>
   <div class="player" v-show="playList.length>0">
     <!-- 播放页面 -->
-    <transition name="normal">
+    <transition name="normal" @enter="enter" @after-enter="afterEnter" @leave="leave" @after-leave="afterLeave">
       <div class="normal-player" v-show="fullScreen">
         <div class="background">
           <img width="100%" height="100%" :src="currentSong.image">
@@ -15,8 +15,8 @@
         </div>
         <div class="middle">
           <div class="middle-l">
-            <div class="cd-wrapper">
-              <div class="cd">
+            <div class="cd-wrapper" ref="cdWrapper">
+              <div class="cd" :class="cdClass">
                 <img class="image" :src="currentSong.image">
               </div>
             </div>
@@ -32,7 +32,7 @@
               <i class="icon-prev"></i>
             </div>
             <div class="icon i-center">
-              <i class="icon-play"></i>
+              <i @click="togglePlaying" :class="playIcon"></i>
             </div>
             <div class="icon i-right">
               <i class="icon-next"></i>
@@ -48,37 +48,127 @@
     <transition name="mini">
       <div class="mini-player" v-show="!fullScreen" @click="open">
         <div class="icon">
-          <img width="40" height="40" :src="currentSong.image">
+          <img :class="cdClass" width="40" height="40" :src="currentSong.image">
         </div>
         <div class="text">
           <h2 class="name" v-html="currentSong.name"></h2>
           <p class="desc" v-html="currentSong.singer"></p>
         </div>
-        <div class="control">
+        <div class="control" @click.stop="togglePlaying">
+          <i :class="miniIcon"></i>
         </div>
-        <div class="control">
+        <div class="control" >
           <i class="icon-playlist"></i>
         </div>
       </div>
     </transition>
+    <audio ref="audio" :src="currentSong.url"></audio>
   </div>
 </template>
 
 <script>
 import { mapGetters, mapMutations } from 'vuex'
+import Animations from 'create-keyframe-animation'
+import { prefixTransform } from 'common/js/dom'
+
+const transform = prefixTransform('transform')
 
 export default {
   computed: {
-    ...mapGetters(['fullScreen', 'playList', 'currentSong'])
+    ...mapGetters(['fullScreen', 'playList', 'currentSong', 'playing']),
+    playIcon() {
+      return this.playing ? 'icon-pause' : 'icon-play'
+    },
+    miniIcon() {
+      return this.playing ? 'icon-pause-mini' : 'icon-play-mini'
+    },
+    cdClass() {
+      return this.playing ? 'play' : 'play pause'
+    }
+  },
+  watch: {
+    currentSong() {
+      // nextTick: 当DOM正在更新时，等待DOM更新完毕执行
+      this.$nextTick(() => {
+        this.$refs.audio.play()
+      })
+    },
+    playing(flag) {
+      // 根据state.playing的状态是否为true来播放和暂停歌曲
+      const audio = this.$refs.audio
+      this.$nextTick(() => {
+        flag ? audio.play() : audio.pause()
+      })
+    }
   },
   methods: {
-    ...mapMutations(['SET_FULL_SCREEN']),
+    ...mapMutations(['SET_FULL_SCREEN', 'SET_PLAYING_STATE']),
     // 关闭播放页
     back() {
       this.SET_FULL_SCREEN(false)
     },
     open() {
       this.SET_FULL_SCREEN(true)
+    },
+    // 在钩子函数中使用js通过第三方插件create-keyframe-animation制作css3动画
+    enter(el, done) {
+      const {x, y, scale} = this._getPosAndScale()
+
+      let animation = {
+        0: {
+          transform: `translate3d(${x}px, ${y}px, 0) scale(${scale})`
+        },
+        60: {
+          transform: `translate3d(0, 0, 0) scale(1.1)`
+        },
+        100: {
+          transform: `translate3d(0, 0, 0) scale(1)`
+        }
+      }
+
+      Animations.registerAnimation({
+        name: 'move',
+        animation,
+        presets: {
+          duration: 400,
+          esing: 'linear'
+        }
+      })
+      Animations.runAnimation(this.$refs.cdWrapper, 'move', done)
+    },
+    afterEnter() {
+      Animations.unregisterAnimation('move')
+      this.$refs.cdWrapper.style.animation = ''
+    },
+    leave(el, done) {
+      this.$refs.cdWrapper.style.transition = 'all 0.4s'
+      const {x, y, scale} = this._getPosAndScale()
+      this.$refs.cdWrapper.style[transform] = `translate3d(${x}, ${y}, scale(${scale}))`
+      this.$refs.cdWrapper.addEventListener('transitionend', done)
+    },
+    afterLeave() {
+      this.$refs.cdWrapper.style.transition = ''
+      this.$refs.cdWrapper.style[transform] = ''
+    },
+    _getPosAndScale() {
+      // 目标位置
+      const targetWidth = 40
+      const paddingLeft = 40
+      const paddingBottom = 30
+      // CD区域位置
+      const paddingTop = 80
+      const width = window.innerWidth * 0.8
+      const scale = targetWidth / width
+      // x y 轴上移动的距离
+      const x = -((window.innerWidth / 2) - paddingLeft)
+      const y = window.innerHeight - paddingTop - (width / 2) - paddingBottom
+
+      return {
+        x, y, scale
+      }
+    },
+    togglePlaying() {
+      this.SET_PLAYING_STATE(!this.playing)
     }
   }
 }
