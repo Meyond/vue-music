@@ -22,20 +22,27 @@
             </div>
           </div>
         </div>
-        <!-- 播放按钮组 -->
+        <!-- 播放控制区 -->
         <div class="bottom">
+          <div class="progress-wrapper">
+            <span class="time time-l">{{currentTime | formatTime}}</span>
+            <div class="progress-bar-wrapper">
+              <progress-bar @percentChange="onProgressBarChange" :percent="percent"></progress-bar>
+            </div>
+            <span class="time time-r">{{currentSong.duration | formatTime}}</span>
+          </div>
           <div class="operators">
             <div class="icon i-left">
               <i class="icon-sequence"></i>
             </div>
-            <div class="icon i-left">
-              <i class="icon-prev"></i>
+            <div class="icon i-left" :class="disableClass">
+              <i @click="prev" class="icon-prev"></i>
             </div>
-            <div class="icon i-center">
+            <div class="icon i-center" :class="disableClass">
               <i @click="togglePlaying" :class="playIcon"></i>
             </div>
-            <div class="icon i-right">
-              <i class="icon-next"></i>
+            <div class="icon i-right" :class="disableClass">
+              <i @click="next" class="icon-next"></i>
             </div>
             <div class="icon i-right">
               <i class="icon icon-not-favorite"></i>
@@ -55,27 +62,44 @@
           <p class="desc" v-html="currentSong.singer"></p>
         </div>
         <div class="control" @click.stop="togglePlaying">
-          <i :class="miniIcon"></i>
+          <progress-circle :radius="radius" :percent="percent">
+            <i class="icon-mini" :class="miniIcon"></i>
+          </progress-circle>
         </div>
-        <div class="control" >
+        <div class="control">
           <i class="icon-playlist"></i>
         </div>
       </div>
     </transition>
-    <audio ref="audio" :src="currentSong.url"></audio>
+    <!-- 当歌曲ready会触发canplay事件，同样歌曲发生错误会触发error事件 -->
+    <audio @canplay="ready" @error="error" ref="audio" :src="currentSong.url" @timeupdate="updateTime"></audio>
   </div>
 </template>
 
 <script>
 import { mapGetters, mapMutations } from 'vuex'
-import Animations from 'create-keyframe-animation'
 import { prefixTransform } from 'common/js/dom'
+import { formatTime } from 'common/js/filter'
+import Animations from 'create-keyframe-animation'
+import ProgressBar from 'base/progress-bar/progress-bar'
+import ProgressCircle from 'base/progress-circle/progress-circle'
 
 const transform = prefixTransform('transform')
 
 export default {
+  data() {
+    return {
+      songReady: false,
+      currentTime: 0,
+      radius: 32
+    }
+  },
   computed: {
-    ...mapGetters(['fullScreen', 'playList', 'currentSong', 'playing']),
+    ...mapGetters(['fullScreen', 'playList', 'currentSong', 'playing', 'currentIndex']),
+    percent() {
+      // 已播放时长占比
+      return this.currentTime / this.currentSong.duration
+    },
     playIcon() {
       return this.playing ? 'icon-pause' : 'icon-play'
     },
@@ -84,6 +108,10 @@ export default {
     },
     cdClass() {
       return this.playing ? 'play' : 'play pause'
+    },
+    disableClass() {
+      // 当歌曲没有准备好，按钮设置为disable样式(置灰)
+      return this.songReady ? '' : 'disable'
     }
   },
   watch: {
@@ -102,7 +130,7 @@ export default {
     }
   },
   methods: {
-    ...mapMutations(['SET_FULL_SCREEN', 'SET_PLAYING_STATE']),
+    ...mapMutations(['SET_FULL_SCREEN', 'SET_PLAYING_STATE', 'SET_CURRENT_INDEX']),
     // 关闭播放页
     back() {
       this.SET_FULL_SCREEN(false)
@@ -110,9 +138,43 @@ export default {
     open() {
       this.SET_FULL_SCREEN(true)
     },
+    next() {
+      // 点击下一曲，如果歌曲ready状态为false，直接返回不进行下一步操作，避免歌曲无法响应切换到下一曲而报错
+      if (!this.songReady) {
+        return
+      }
+      let index = this.currentIndex + 1
+      if (index === this.playList.length) {
+        index = 0
+      }
+      this.SET_CURRENT_INDEX(index)
+      // 切到下一曲playing切换为播放状态
+      if (!this.playing) {
+        this.togglePlaying()
+      }
+      this.songReady = false
+    },
+    prev() {
+      if (!this.songReady) {
+        return
+      }
+      let index = this.currentIndex - 1
+      if (index === -1) {
+        index = this.playList.length - 1
+      }
+      this.SET_CURRENT_INDEX(index)
+      if (!this.playing) {
+        this.togglePlaying()
+      }
+      this.songReady = false
+    },
+    updateTime(e) {
+      // 歌曲播放时间
+      this.currentTime = e.target.currentTime
+    },
     // 在钩子函数中使用js通过第三方插件create-keyframe-animation制作css3动画
     enter(el, done) {
-      const {x, y, scale} = this._getPosAndScale()
+      const { x, y, scale } = this._getPosAndScale()
 
       let animation = {
         0: {
@@ -142,13 +204,20 @@ export default {
     },
     leave(el, done) {
       this.$refs.cdWrapper.style.transition = 'all 0.4s'
-      const {x, y, scale} = this._getPosAndScale()
+      const { x, y, scale } = this._getPosAndScale()
       this.$refs.cdWrapper.style[transform] = `translate3d(${x}, ${y}, scale(${scale}))`
       this.$refs.cdWrapper.addEventListener('transitionend', done)
     },
     afterLeave() {
       this.$refs.cdWrapper.style.transition = ''
       this.$refs.cdWrapper.style[transform] = ''
+    },
+    ready() {
+      this.songReady = true
+    },
+    error() {
+      // 当前歌曲加载失败，让它也可以进行切换操作
+      this.songReady = true
     },
     _getPosAndScale() {
       // 目标位置
@@ -167,9 +236,23 @@ export default {
         x, y, scale
       }
     },
+    onProgressBarChange(percent) {
+      this.$refs.audio.currentTime = percent * this.currentSong.duration
+      // 如果当前不是播放状态,拖动后播放
+      if (!this.playing) {
+        this.togglePlaying()
+      }
+    },
     togglePlaying() {
       this.SET_PLAYING_STATE(!this.playing)
     }
+  },
+  filters: {
+    formatTime
+  },
+  components: {
+    ProgressBar,
+    ProgressCircle
   }
 }
 </script>
