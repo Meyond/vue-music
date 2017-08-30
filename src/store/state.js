@@ -13,7 +13,7 @@ const state = {
   // 顺序列表
   sequenceList: [],
   // 播放模式
-  mode: playMode,
+  mode: playMode.sequence,
   // 当前歌曲索引
   currentIndex: -1
 

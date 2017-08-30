@@ -23,7 +23,7 @@
     data() {
       return {
         // 描边周长(viewBox直径100)
-        dashArray: Math.PI * 100,
+        dashArray: Math.PI * 100
       }
     },
     computed: {

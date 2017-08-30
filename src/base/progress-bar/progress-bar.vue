@@ -63,7 +63,15 @@ export default {
       this._triggerPercent()
     },
     progressClick(e) {
-      this._offset(e.offsetX)
+      // this._offset(e.offsetX)
+      /**
+       * 点击progressBtn时e.offsetX值会出现问题
+       * 在这里可以通过计算点击位置距离页面左边的距离再减去progress左外边距得到e.offset
+       */
+      const rect = this.$refs.progressBar.getBoundingClientRect()
+      const offsetWidth = e.pageX - rect.left
+      this._offset(offsetWidth)
+
       this._triggerPercent()
     },
     // 根据offsetWidth设置进度条偏移量

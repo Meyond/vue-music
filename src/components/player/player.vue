@@ -32,8 +32,8 @@
             <span class="time time-r">{{currentSong.duration | formatTime}}</span>
           </div>
           <div class="operators">
-            <div class="icon i-left">
-              <i class="icon-sequence"></i>
+            <div class="icon i-left" @click="changeMode">
+              <i :class="iconMode"></i>
             </div>
             <div class="icon i-left" :class="disableClass">
               <i @click="prev" class="icon-prev"></i>
@@ -71,15 +71,16 @@
         </div>
       </div>
     </transition>
-    <!-- 当歌曲ready会触发canplay事件，同样歌曲发生错误会触发error事件 -->
-    <audio @canplay="ready" @error="error" ref="audio" :src="currentSong.url" @timeupdate="updateTime"></audio>
+    <!-- 当歌曲ready会触发canplay事件，同样歌曲发生错误会触发error事件,播放完毕会触发ended事件 -->
+    <audio @canplay="ready" @error="error" ref="audio" :src="currentSong.url" @timeupdate="updateTime" @ended="end"></audio>
   </div>
 </template>
 
 <script>
 import { mapGetters, mapMutations } from 'vuex'
 import { prefixTransform } from 'common/js/dom'
-import { formatTime } from 'common/js/filter'
+import { formatTime, shuffle } from 'common/js/utils'
+import { playMode } from 'common/js/config'
 import Animations from 'create-keyframe-animation'
 import ProgressBar from 'base/progress-bar/progress-bar'
 import ProgressCircle from 'base/progress-circle/progress-circle'
@@ -95,7 +96,7 @@ export default {
     }
   },
   computed: {
-    ...mapGetters(['fullScreen', 'playList', 'currentSong', 'playing', 'currentIndex']),
+    ...mapGetters(['fullScreen', 'playList', 'currentSong', 'playing', 'currentIndex', 'mode', 'sequenceList']),
     percent() {
       // 已播放时长占比
       return this.currentTime / this.currentSong.duration
@@ -112,10 +113,17 @@ export default {
     disableClass() {
       // 当歌曲没有准备好，按钮设置为disable样式(置灰)
       return this.songReady ? '' : 'disable'
+    },
+    iconMode() {
+      return this.mode === playMode.sequence ? 'icon-sequence' : this.mode === playMode.loop ? 'icon-loop' : 'icon-random'
     }
   },
   watch: {
-    currentSong() {
+    currentSong(newSong, oldSong) {
+      // 如果要切换的歌曲的id和当前歌曲id相同，则继续播放
+      if (newSong.id === oldSong.id) {
+        return
+      }
       // nextTick: 当DOM正在更新时，等待DOM更新完毕执行
       this.$nextTick(() => {
         this.$refs.audio.play()
@@ -130,13 +138,26 @@ export default {
     }
   },
   methods: {
-    ...mapMutations(['SET_FULL_SCREEN', 'SET_PLAYING_STATE', 'SET_CURRENT_INDEX']),
+    ...mapMutations(['SET_FULL_SCREEN', 'SET_PLAYING_STATE', 'SET_CURRENT_INDEX', 'SET_PLAY_MODE', 'SET_PLAYLIST']),
     // 关闭播放页
     back() {
       this.SET_FULL_SCREEN(false)
     },
     open() {
       this.SET_FULL_SCREEN(true)
+    },
+    // 歌曲播放完毕时
+    end() {
+      if (this.mode === playMode.loop) {
+        this.loop()
+      } else {
+        this.next()
+      }
+    },
+    loop() {
+      // 将当前歌曲切到开始位置继续播放
+      this.$refs.audio.currentTime = 0
+      this.$refs.audio.play()
     },
     next() {
       // 点击下一曲，如果歌曲ready状态为false，直接返回不进行下一步操作，避免歌曲无法响应切换到下一曲而报错
@@ -245,6 +266,29 @@ export default {
     },
     togglePlaying() {
       this.SET_PLAYING_STATE(!this.playing)
+    },
+    changeMode() {
+      // 三种播放模式 0 1 2
+      const mode = (this.mode + 1) % 3
+      this.SET_PLAY_MODE(mode)
+      let list = null
+      if (mode === playMode.random) {
+        list = shuffle(this.sequenceList)
+      } else {
+        list = this.sequenceList
+      }
+      this.resetCurrentIndex(list)
+      this.SET_PLAYLIST(list)
+    },
+    /**
+     * 切换成随机播放，当前播放歌曲不发生改变
+     * findIndex为ES6语法，返回符合条件的元素的index
+     */
+    resetCurrentIndex(list) {
+      let index = list.findIndex((item) => {
+        return item.id === this.currentSong.id
+      })
+      this.SET_CURRENT_INDEX(index)
     }
   },
   filters: {
@@ -435,6 +479,7 @@ export default {
           transition: all 0.4s cubic-bezier(0.86, 0.18, 0.82, 1.32)
       &.normal-enter, &.normal-leave-to
         opacity: 0
+        display: none
         .top
           transform: translate3d(0, -100px, 0)
         .bottom
