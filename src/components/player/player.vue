@@ -21,6 +21,14 @@
               </div>
             </div>
           </div>
+          <!-- 歌词部分 当currentLyric.lines不为空时，将数据传入scroll组件，当lines发生变化，会自动刷新scroll-->
+          <scroll class="middle-r" ref="lyricList" :data="currentLyric && currentLyric.lines">
+            <div class="lyric-wrapper">
+              <div v-if="currentLyric">
+                <p ref="lyricLine" :class="{'current' : currentLineNum === index }" class="text" v-for="(line, index) in currentLyric.lines" :key="index">{{line.txt}}</p>
+              </div>
+            </div>
+          </scroll>
         </div>
         <!-- 播放控制区 -->
         <div class="bottom">
@@ -77,13 +85,15 @@
 </template>
 
 <script>
+import Animations from 'create-keyframe-animation'
+import LyricParser from 'lyric-parser'
+import Scroll from 'base/scroll/scroll'
+import ProgressBar from 'base/progress-bar/progress-bar'
+import ProgressCircle from 'base/progress-circle/progress-circle'
 import { mapGetters, mapMutations } from 'vuex'
 import { prefixTransform } from 'common/js/dom'
 import { formatTime, shuffle } from 'common/js/utils'
 import { playMode } from 'common/js/config'
-import Animations from 'create-keyframe-animation'
-import ProgressBar from 'base/progress-bar/progress-bar'
-import ProgressCircle from 'base/progress-circle/progress-circle'
 
 const transform = prefixTransform('transform')
 
@@ -92,7 +102,9 @@ export default {
     return {
       songReady: false,
       currentTime: 0,
-      radius: 32
+      radius: 32,
+      currentLyric: null,
+      currentLineNum: 0
     }
   },
   computed: {
@@ -127,6 +139,7 @@ export default {
       // nextTick: 当DOM正在更新时，等待DOM更新完毕执行
       this.$nextTick(() => {
         this.$refs.audio.play()
+        this.getLyric()
       })
     },
     playing(flag) {
@@ -257,6 +270,25 @@ export default {
         x, y, scale
       }
     },
+    getLyric() {
+      this.currentSong.getLyric().then((lyric) => {
+        this.currentLyric = new LyricParser(lyric, this.handleLyric)
+        console.log(this.currentLyric)
+        if (this.playing) {
+          this.currentLyric.play()
+        }
+      })
+    },
+    handleLyric({lineNum, txt}) {
+      this.currentLineNum = lineNum
+      // 当歌词大于5行，滚动到当前歌词行前5行，让当前歌词行居中
+      if (lineNum > 5) {
+        let lineEl = this.$refs.lyricLine[lineNum - 5]
+        this.$refs.lyricList.scrollToElement(lineEl, 1000)
+      } else {
+        this.$refs.lyricList.scrollToElement(0, 0, 1000)
+      }
+    },
     onProgressBarChange(percent) {
       this.$refs.audio.currentTime = percent * this.currentSong.duration
       // 如果当前不是播放状态,拖动后播放
@@ -296,7 +328,8 @@ export default {
   },
   components: {
     ProgressBar,
-    ProgressCircle
+    ProgressCircle,
+    Scroll
   }
 }
 </script>
